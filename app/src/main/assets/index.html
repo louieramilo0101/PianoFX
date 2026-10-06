@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Piano FX</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#0b0d12;--card:#161a23;--card2:#1e2430;--tx:#eef1f6;--mut:#8a93a6;--ac:#4fd1c5;--ac2:#7c8cff;--warn:#ff6b6b}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#app{max-width:480px;margin:0 auto;padding:12px 14px 120px}
+header{display:flex;justify-content:space-between;align-items:center;padding:6px 0 12px}
+h1{font-size:22px;margin:0;letter-spacing:.5px}h1 b{color:var(--ac)}
+.st{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mut);background:var(--card);padding:8px 12px;border-radius:20px}
+.dot{width:10px;height:10px;border-radius:50%;background:#444}.dot.on{background:#3ddc84}
+.panel{background:var(--card);border-radius:18px;padding:14px;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:12px}
+.lbl{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.chip{flex:none;padding:12px 16px;border-radius:14px;background:var(--card2);color:var(--tx);border:0;font-size:15px}
+.chip.sel{background:var(--ac);color:#06201d;font-weight:700}
+#act{width:18px;height:18px;border-radius:50%;background:#2a3140;transition:.08s}#act.hit{background:var(--ac);box-shadow:0 0 14px var(--ac)}
+#last{font-size:12px;color:var(--mut);min-height:16px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:36px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:10px;border-radius:5px;background:var(--card2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:50%;background:var(--ac);margin-top:-10px}
+input[type=range]::-moz-range-track{height:10px;border-radius:5px;background:var(--card2)}
+input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radius:50%;background:var(--ac)}
+.flow{text-align:center;color:var(--mut);font-size:13px;margin:4px 0}
+.fx{background:var(--card);border-radius:18px;margin-bottom:6px;overflow:hidden;border-left:5px solid var(--ac2)}
+.fx.off{border-left-color:#444;opacity:.6}
+.fh{display:flex;align-items:center;gap:6px;padding:10px 10px 10px 14px}
+.fh .nm{flex:1;font-weight:700;font-size:17px}.fh .nm small{color:var(--mut);font-weight:400;font-size:11px;margin-left:6px}
+.ib{width:44px;height:44px;border-radius:12px;border:0;background:var(--card2);color:var(--tx);font-size:18px}
+.ib.del{color:var(--warn)}
+.tg{min-width:60px;height:44px;border-radius:12px;border:0;font-weight:800;background:var(--ac);color:#06201d}
+.fx.off .tg{background:#3a4152;color:var(--mut)}
+.fb{padding:0 14px 12px;display:none}.fx.open .fb{display:block}
+.pr{display:grid;grid-template-columns:80px 1fr 56px;align-items:center;gap:8px}
+.pr span:first-child{font-size:14px;color:var(--mut)}.pr span:last-child{font-size:13px;text-align:right}
+.mv{display:flex;gap:8px;margin-top:6px}.mv .ib{flex:1;font-size:14px}
+#keys{display:flex;height:64px;margin-top:10px;position:relative}
+.k{flex:1;background:#e9ecf2;border-radius:0 0 6px 6px;margin:0 1px;border:0}
+.k.b{background:#222;height:62%;position:absolute;width:6%;margin:0;z-index:2;border-radius:0 0 4px 4px}
+.k.dn{background:var(--ac)}
+footer{position:fixed;left:0;right:0;bottom:0;background:#0f121a;border-top:1px solid #222a38;padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
+footer .in{max-width:480px;margin:0 auto;display:flex;gap:14px;align-items:center}
+.add{height:54px;padding:0 20px;border-radius:16px;border:0;background:var(--ac);color:#06201d;font-weight:800;font-size:16px}
+#sheet{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;z-index:9}
+#sheet.show{display:flex}
+.sh{background:var(--card);width:100%;max-width:480px;margin:0 auto;border-radius:24px 24px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom,0px));max-height:85%;overflow:auto}
+.sh h3{margin:14px 0 8px;font-size:12px;color:var(--mut);letter-spacing:1px;text-transform:uppercase}
+.btn{display:block;width:100%;text-align:left;padding:14px;margin-bottom:6px;border:0;border-radius:14px;background:var(--card2);color:var(--tx);font-size:16px}
+.btn small{display:block;color:var(--mut);font-size:12px}
+input[type=text]{width:100%;padding:12px;border-radius:12px;border:1px solid #333b4c;background:var(--bg);color:var(--tx);font-size:16px;margin-bottom:6px}
+label.btn{cursor:pointer}input[type=file]{display:none}
+pre{font-size:11px;background:var(--bg);padding:10px;border-radius:10px;overflow-x:auto;color:var(--mut)}
+#msg{font-size:13px;color:var(--ac);min-height:18px;margin-top:6px}
+</style></head><body>
+<div id="app">
+<header><h1>Piano<b>FX</b></h1><div class="st"><span class="dot" id="mdot"></span><span id="mtxt">Starting…</span></div></header>
+<div class="panel">
+<div class="lbl">Piano preset</div><div class="chips" id="pre"></div>
+<div class="row" style="margin-top:10px"><div style="flex:1"><div class="lbl">Piano volume</div><input type="range" id="pvol" min="0" max="1" step=".01" value=".8"></div>
+<div style="text-align:center"><div class="lbl">MIDI</div><div id="act"></div></div></div>
+<div id="last">Tap keys below or play your MIDI keyboard</div>
+<div id="keys"></div></div>
+<div class="flow">🎹 Piano</div><div class="flow">↓</div>
+<div id="chain"></div>
+<div class="flow">↓</div><div class="flow">🔊 Master</div>
+</div>
+<footer><div class="in"><button class="add" id="addb">+ ADD EFFECT</button><div style="flex:1"><div class="lbl" style="margin:0">Master</div><input type="range" id="mvol" min="0" max="1" step=".01" value=".8"></div></div></footer>
+<div id="sheet"><div class="sh" id="sh"></div></div>
+<script>
+// ===== Effect library: engine kinds. Each defines default params + a DSP builder (the "Audio Effect Host" plugin contract) =====
+const P=(id,label,min,max,def,unit)=>({id,label,min,max,def,unit:unit||''});
+const ENGINES={
+eq:{params:[P('low','Low',-12,12,0,'dB'),P('mid','Mid',-12,12,0,'dB'),P('high','High',-12,12,0,'dB')],
+ build(c){const i=c.createGain(),a=c.createBiquadFilter(),b=c.createBiquadFilter(),d=c.createBiquadFilter();a.type='lowshelf';a.frequency.value=200;b.type='peaking';b.frequency.value=1000;d.type='highshelf';d.frequency.value=4000;i.connect(a);a.connect(b);b.connect(d);
+ return{i,o:d,set:(k,v)=>({low:a,mid:b,high:d}[k].gain.value=v)}}},
+chorus:{params:[P('rate','Rate',.1,5,.8,'Hz'),P('depth','Depth',0,1,.5),P('mix','Mix',0,1,.4)],
+ build(c){const i=c.createGain(),o=c.createGain(),dry=c.createGain(),wet=c.createGain(),d=c.createDelay(),l=c.createOscillator(),lg=c.createGain();d.delayTime.value=.02;l.frequency.value=.8;l.connect(lg);lg.connect(d.delayTime);l.start();i.connect(dry);dry.connect(o);i.connect(d);d.connect(wet);wet.connect(o);
+ return{i,o,set:(k,v)=>{if(k=='rate')l.frequency.value=v;if(k=='depth')lg.gain.value=v*.008;if(k=='mix'){wet.gain.value=v;dry.gain.value=1-v*.5}}}}},
+delay:{params:[P('time','Time',.05,1,.4,'s'),P('feedback','Feedback',0,.9,.35),P('mix','Mix',0,1,.3)],
+ build(c){const i=c.createGain(),o=c.createGain(),dry=c.createGain(),wet=c.createGain(),d=c.createDelay(2),f=c.createGain();i.connect(dry);dry.connect(o);i.connect(d);d.connect(f);f.connect(d);d.connect(wet);wet.connect(o);
+ return{i,o,set:(k,v)=>{if(k=='time')d.delayTime.value=v;if(k=='feedback')f.gain.value=v;if(k=='mix')wet.gain.value=v}}}},
+reverb:{params:[P('mix','Mix',0,1,.3),P('size','Size',0,1,.5),P('decay','Decay',.3,6,2.5,'s'),P('damping','Damping',0,1,.4)],
+ build(c){const i=c.createGain(),o=c.createGain(),dry=c.createGain(),wet=c.createGain(),cv=c.createConvolver();i.connect(dry);dry.connect(o);i.connect(cv);cv.connect(wet);wet.connect(o);
+ const v={size:.5,decay:2.5,damping:.4};let t;const gen=()=>{const len=Math.max(.2,v.decay*(.5+v.size)),n=c.sampleRate*len|0,b=c.createBuffer(2,n,c.sampleRate);for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch);let lp=0;for(let s=0;s<n;s++){lp+=(Math.random()*2-1-lp)*(1-v.damping*.95);d[s]=lp*Math.pow(1-s/n,3)}}cv.buffer=b};gen();
+ return{i,o,set:(k,x)=>{if(k=='mix'){wet.gain.value=x;dry.gain.value=1-x*.4}else{v[k]=x;clearTimeout(t);t=setTimeout(gen,120)}}}}},
+drive:{params:[P('drive','Drive',0,1,.3),P('tone','Tone',200,8000,3000,'Hz'),P('mix','Mix',0,1,.5)],
+ build(c){const i=c.createGain(),o=c.createGain(),dry=c.createGain(),wet=c.createGain(),w=c.createWaveShaper(),f=c.createBiquadFilter();f.frequency.value=3000;i.connect(dry);dry.connect(o);i.connect(w);w.connect(f);f.connect(wet);wet.connect(o);
+ return{i,o,set:(k,v)=>{if(k=='drive'){const n=256,cu=new Float32Array(n),g=1+v*20;for(let s=0;s<n;s++){const x=s/n*2-1;cu[s]=Math.tanh(x*g)}w.curve=cu}if(k=='tone')f.frequency.value=v;if(k=='mix'){wet.gain.value=v;dry.gain.value=1-v}}}}}
+};
+const BUILTIN=[['eq','EQ','3-band tone'],['chorus','Chorus','Width & shimmer'],['delay','Delay','Echo'],['reverb','Reverb','Room / hall'],['drive','Drive','Warm saturation']];
+// Sample .pfx package (JSON manifest for the prototype). Real .pfx = zip: manifest.json + dsp (WASM/Faust) + presets + assets
+const SAMPLE_PFX={format:'pfx',name:'Shimmer Hall',version:'1.2.0',engine:'reverb',author:'Demo',
+ params:[{id:'mix',label:'Mix',min:0,max:1,def:.45},{id:'size',label:'Size',min:0,max:1,def:.9},{id:'decay',label:'Decay',min:.5,max:6,def:5,unit:'s'},{id:'damping',label:'Damping',min:0,max:1,def:.25}],
+ presets:[{name:'Cathedral',values:{mix:.5,size:1,decay:6,damping:.2}},{name:'Tight Room',values:{mix:.25,size:.2,decay:1,damping:.6}}],assets:[]};
+const PIANOS=[['Grand Piano',{h:[1,.5,.25,.1],d:2.2,br:5000}],['Worship Piano',{h:[1,.6,.3,.15],d:3.2,br:3800}],['Bright Piano',{h:[1,.7,.5,.4],d:1.8,br:9000}],['Soft Piano',{h:[1,.25,.08,.02],d:2.6,br:2200}],['Ambient Piano',{h:[1,.4,.2,.1],d:5,br:3000}]];
+const CHAIN_PRESETS={'Worship Piano':['eq','chorus','delay','reverb'],'Clean Grand':['eq','reverb'],'Dream Pad':['chorus','delay','reverb']};
+const $=s=>document.querySelector(s);let uid=1;
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+// ===== Audio Effect Host: owns chain, wiring, bypass, reorder. Knows nothing about MIDI or piano =====
+class EffectHost{
+ constructor(ctx){this.c=ctx;this.fx=[];this.input=ctx.createGain();this.master=ctx.createGain();this.master.connect(ctx.destination)}
+ make(def,vals){const inst={uid:uid++,kind:def.kind,name:def.name,ver:def.version||'built-in',params:def.params,presets:def.presets||[],vals:{},on:true,open:true};
+  def.params.forEach(p=>inst.vals[p.id]=vals&&vals[p.id]!=null?vals[p.id]:p.def);
+  inst.node=ENGINES[def.kind].build(this.c);def.params.forEach(p=>inst.node.set(p.id,inst.vals[p.id]));return inst}
+ add(def,vals){this.fx.push(this.make(def,vals));this.wire()}
+ remove(u){const f=this.fx.find(x=>x.uid==u);try{f.node.o.disconnect()}catch(e){}this.fx=this.fx.filter(x=>x.uid!=u);this.wire()}
+ move(u,d){const i=this.fx.findIndex(x=>x.uid==u),j=i+d;if(j<0||j>=this.fx.length)return;[this.fx[i],this.fx[j]]=[this.fx[j],this.fx[i]];this.wire()}
+ set(inst,k,v){inst.vals[k]=v;inst.node.set(k,v)}
+ wire(){try{this.input.disconnect()}catch(e){}this.fx.forEach(f=>{try{f.node.o.disconnect()}catch(e){}});
+  let prev=this.input;this.fx.filter(f=>f.on).forEach(f=>{prev.connect(f.node.i);prev=f.node.o});prev.connect(this.master)}
+ clear(){this.fx.forEach(f=>{try{f.node.o.disconnect()}catch(e){}});this.fx=[];this.wire()}
+}
+// ===== Piano / Sound Engine =====
+class Piano{
+ constructor(ctx,out){this.c=ctx;this.out=ctx.createGain();this.out.gain.value=.8;this.out.connect(out);this.v={};this.sus=false;this.held=new Set();this.p=PIANOS[0][1]}
+ on(n,vel){this.stop(n,true);const c=this.c,t=c.currentTime,f=440*Math.pow(2,(n-69)/12),g=c.createGain(),lp=c.createBiquadFilter(),a=vel/127*.5,p=this.p;
+  lp.frequency.value=Math.min(p.br*(.4+vel/127),16000);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(a,t+.005);g.gain.exponentialRampToValueAtTime(a*.001,t+p.d*(1.4-n/127));
+  const os=p.h.map((h,k)=>{const o=c.createOscillator(),og=c.createGain();o.type=k?'sine':'triangle';o.frequency.value=f*(k+1);og.gain.value=h/p.h.length;o.connect(og);og.connect(lp);o.start(t);return o});
+  lp.connect(g);g.connect(this.out);this.v[n]={g,os};this.held.add(n)}
+ off(n){this.held.delete(n);if(!this.sus)this.stop(n)}
+ stop(n,quick){const v=this.v[n];if(!v)return;const t=this.c.currentTime;v.g.gain.cancelScheduledValues(t);v.g.gain.setTargetAtTime(0,t,quick?.01:.25);v.os.forEach(o=>o.stop(t+(quick?.1:1.5)));delete this.v[n]}
+ pedal(d){this.sus=d;if(!d)Object.keys(this.v).forEach(n=>{if(!this.held.has(+n))this.stop(+n)})}
+}
+// ===== MIDI Engine: parses messages, emits note/pedal events to whatever listens =====
+class Midi{
+ constructor(h){this.h=h}
+ async init(){window.onNativeMidi=d=>this.msg(d);window.onNativeStatus=(n,t)=>this.h.status(n,t);if(/Android/.test(navigator.userAgent)&&/wv\)/.test(navigator.userAgent)){this.h.status(0,'Waiting for MIDI…');return}if(!navigator.requestMIDIAccess)return this.h.status(0,'No Web MIDI – use on-screen keys');
+  try{const a=await navigator.requestMIDIAccess();const scan=()=>{const ins=[...a.inputs.values()];ins.forEach(i=>i.onmidimessage=m=>this.msg(m.data));this.h.status(ins.length,ins.length?ins.map(i=>i.name).join(', '):'No keyboard connected')};a.onstatechange=scan;scan()}
+  catch(e){this.h.status(0,'MIDI blocked – use on-screen keys')}}
+ msg(d){const t=d[0]&240,ch=(d[0]&15)+1;if(t==144&&d[2]>0)this.h.note(d[1],d[2],ch);else if(t==128||t==144)this.h.off(d[1],ch);else if(t==176&&d[1]==64)this.h.pedal(d[2]>=64,ch)}
+}
+// ===== App =====
+let ctx,host,piano,midi;
+function boot(){if(ctx){ctx.resume();return}ctx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});host=new EffectHost(ctx);piano=new Piano(ctx,host.input);host.master.gain.value=.8;piano.p=PIANOS[sel][1];loadChain(CHAIN_PRESETS['Worship Piano'])}
+let sel=1,pendingChain=null;
+function builtinDef(k){const n=BUILTIN.find(b=>b[0]==k);return{kind:k,name:n[1],params:ENGINES[k].params}}
+function loadChain(list){host.clear();list.forEach(x=>host.add(typeof x=='string'?builtinDef(x):x.def,x.vals));render()}
+function render(){const el=$('#chain');if(!host||!host.fx.length){el.innerHTML='<div class="panel" style="text-align:center;color:#8a93a6">No effects yet.<br>Tap + ADD EFFECT</div>';return}
+ el.innerHTML='';host.fx.forEach((f,idx)=>{const d=document.createElement('div');d.className='fx'+(f.on?'':' off')+(f.open?' open':'');
+  d.innerHTML=`<div class="fh"><div class="nm">${esc(f.name)}<small>${esc(f.ver)}</small></div><button class="tg">${f.on?'ON':'OFF'}</button><button class="ib ex">${f.open?'▾':'▸'}</button></div><div class="fb"></div>`;
+  const fb=d.querySelector('.fb');
+  f.params.forEach(p=>{const r=document.createElement('div');r.className='pr';const step=(p.max-p.min)/200;r.innerHTML=`<span>${esc(p.label)}</span><input type="range" min="${p.min}" max="${p.max}" step="${step}" value="${f.vals[p.id]}"><span></span>`;const out=r.lastChild,inp=r.children[1];const show=()=>out.textContent=(+inp.value).toFixed(p.max-p.min>20?0:2)+(p.unit?' '+p.unit:'');show();inp.oninput=()=>{host.set(f,p.id,+inp.value);show()};fb.appendChild(r)});
+  if(f.presets.length){const c=document.createElement('div');c.className='chips';c.style.marginTop='8px';f.presets.forEach(pr=>{const b=document.createElement('button');b.className='chip';b.textContent=pr.name;b.onclick=()=>{Object.entries(pr.values).forEach(([k,v])=>host.set(f,k,v));render()};c.appendChild(b)});fb.appendChild(c)}
+  const m=document.createElement('div');m.className='mv';m.innerHTML='<button class="ib up">▲ Up</button><button class="ib dn">▼ Down</button><button class="ib del">🗑 Delete</button>';fb.appendChild(m);
+  d.querySelector('.tg').onclick=()=>{f.on=!f.on;host.wire();render()};d.querySelector('.ex').onclick=()=>{f.open=!f.open;render()};
+  m.querySelector('.up').onclick=()=>{host.move(f.uid,-1);render()};m.querySelector('.dn').onclick=()=>{host.move(f.uid,1);render()};m.querySelector('.del').onclick=()=>{host.remove(f.uid);render()};
+  el.appendChild(d);if(idx<host.fx.length-1){const a=document.createElement('div');a.className='flow';a.textContent='↓';el.appendChild(a)}})}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&lt;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// pfx parsing + validation: parameters drive the auto-generated UI
+function parsePfx(txt){const j=JSON.parse(txt);if(j.format!='pfx'||!ENGINES[j.engine]||!Array.isArray(j.params))throw Error('Not a valid .pfx package');
+ const params=j.params.map(p=>({id:String(p.id),label:String(p.label||p.id),min:+p.min,max:+p.max,def:+(p.def??p.min),unit:p.unit||''}));return{kind:j.engine,name:j.name||'Imported',version:j.version||'1.0',params,presets:j.presets||[]}}
+function addPfx(txt){const d=parsePfx(txt);host.add(d);render();return d}
+// MIDI handlers + on-screen keys
+let actT;function flash(t){const a=$('#act');a.classList.add('hit');$('#last').textContent=t;clearTimeout(actT);actT=setTimeout(()=>a.classList.remove('hit'),120)}
+const NN=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const H={status(n,t){$('#mdot').className='dot'+(n?' on':'');$('#mtxt').textContent=t},
+ note(n,v,ch){boot();piano.on(n,v);flash(`Note ${NN[n%12]}${Math.floor(n/12)-1} · vel ${v} · ch ${ch}`)},off(n){piano&&piano.off(n)},
+ pedal(d,ch){boot();piano.pedal(d);flash('Sustain '+(d?'DOWN':'up')+' · ch '+ch)}};
+function drawKeys(){const k=$('#keys'),blk=[1,3,6,8,10];let w=0;for(let n=60;n<=72;n++){if(blk.includes(n%12))continue;const b=document.createElement('button');b.className='k';b.dataset.n=n;k.appendChild(b)}
+ const whites=[...k.children].length;let wi=0;for(let n=60;n<=72;n++){if(blk.includes(n%12)){const b=document.createElement('button');b.className='k b';b.dataset.n=n;b.style.left=`calc(${wi/whites*100}% - 3%)`;k.appendChild(b)}else wi++}
+ k.querySelectorAll('.k').forEach(b=>{const n=+b.dataset.n;b.onpointerdown=e=>{b.setPointerCapture(e.pointerId);b.classList.add('dn');H.note(n,100,1)};const u=()=>{b.classList.remove('dn');H.off(n)};b.onpointerup=u;b.onpointercancel=u})}
+// sheet
+function sheet(open){$('#sheet').classList.toggle('show',open)}
+function openAdd(msg){const saved=store.get('pfx_presets')||{};
+ $('#sh').innerHTML=`<div class="row"><b style="flex:1;font-size:20px">Add Effect</b><button class="ib" id="cl">✕</button></div>
+ <h3>Built-in Effects</h3>${BUILTIN.map(b=>`<button class="btn" data-b="${b[0]}">${b[1]}<small>${b[2]}</small></button>`).join('')}
+ <h3>Import Effect</h3><label class="btn">📦 Choose .pfx file<small>Parameters become controls automatically</small><input type="file" id="fp" accept=".pfx,.json"></label>
+ <button class="btn" id="smp">Try sample package: Shimmer Hall v1.2.0<small>Imported reverb defining Mix, Size, Decay, Damping + 2 presets</small></button>
+ <h3>Import Preset</h3>${Object.keys({...CHAIN_PRESETS,...saved}).map(k=>`<button class="btn" data-p="${esc(k)}">🎛 ${esc(k)}<small>Load full effect chain</small></button>`).join('')}
+ <label class="btn">📂 Import chain preset file (.json)<input type="file" id="fc" accept=".json,.pfxp"></label>
+ <h3>Save current chain as preset</h3><input type="text" id="pn" placeholder="Preset name"><button class="btn" id="sv">💾 Save chain</button>
+ <div id="msg">${msg||''}</div>
+ <h3>.pfx manifest (prototype)</h3><pre>{ "format":"pfx", "name":"Shimmer Hall",
+  "version":"1.2.0", "engine":"reverb",
+  "params":[{"id":"mix","label":"Mix",
+    "min":0,"max":1,"def":.45}, …],
+  "presets":[{"name":"Cathedral","values":{…}}],
+  "assets":[] }</pre>`;
+ const s=$('#sh');$('#cl').onclick=()=>sheet(0);
+ s.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{boot();host.add(builtinDef(b.dataset.b));render();sheet(0)});
+ const say=t=>{$('#msg').textContent=t};
+ const rd=(inp,fn)=>inp.onchange=()=>{const f=inp.files[0];if(!f)return;f.text().then(fn).catch(e=>say('⚠ '+e.message))};
+ rd($('#fp'),t=>{boot();const d=addPfx(t);sheet(0)});
+ $('#smp').onclick=()=>{boot();addPfx(JSON.stringify(SAMPLE_PFX));sheet(0)};
+ s.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{boot();const k=b.dataset.p;const l=CHAIN_PRESETS[k]||saved[k];loadChain(l.map(x=>typeof x=='string'?x:x));sheet(0)});
+ rd($('#fc'),t=>{boot();const j=JSON.parse(t);if(!Array.isArray(j.chain))throw Error('Invalid preset');loadChain(j.chain.filter(x=>typeof x=='string'&&ENGINES[x]));sheet(0)});
+ $('#sv').onclick=()=>{const n=$('#pn').value.trim();if(!n||!host)return say('Enter a name first');const sv=store.get('pfx_presets')||{};sv[n]=host.fx.map(f=>ENGINES[f.kind]&&BUILTIN.some(b=>b[0]==f.kind)&&f.ver=='built-in'?{def:{kind:f.kind,name:f.name,params:f.params},vals:f.vals}:{def:{kind:f.kind,name:f.name,version:f.ver,params:f.params,presets:f.presets},vals:f.vals});store.set('pfx_presets',sv);say('Saved "'+n+'"')};
+ sheet(1)}
+// init
+PIANOS.forEach((p,i)=>{const b=document.createElement('button');b.className='chip'+(i==sel?' sel':'');b.textContent=p[0];b.onclick=()=>{sel=i;if(piano)piano.p=p[1];document.querySelectorAll('#pre .chip').forEach((c,j)=>c.classList.toggle('sel',j==i))};$('#pre').appendChild(b)});
+$('#pvol').oninput=e=>{boot();piano.out.gain.value=+e.target.value};
+$('#mvol').oninput=e=>{boot();host.master.gain.value=+e.target.value};
+$('#addb').onclick=()=>openAdd();
+$('#sheet').onclick=e=>{if(e.target.id=='sheet')sheet(0)};
+drawKeys();render();new Midi(H).init();
+document.addEventListener('pointerdown',()=>{if(!ctx)boot();else ctx.resume()},{once:false});
+</script></body></html>
