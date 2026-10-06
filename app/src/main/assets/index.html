@@ -56,22 +56,20 @@ input[type=text]{width:100%;padding:12px;border-radius:12px;border:1px solid #33
 label.btn{cursor:pointer}input[type=file]{display:none}
 pre{font-size:11px;background:var(--bg);padding:10px;border-radius:10px;overflow-x:auto;color:var(--mut)}
 #msg{font-size:13px;color:var(--ac);min-height:18px;margin-top:6px}
+#fxwhich,#chain,.fxbtn{display:none!important}
 </style></head><body>
 <div id="app">
-<header><h1>Piano<b>FX</b></h1><div class="st"><span class="dot" id="mdot"></span><span id="mtxt">Starting…</span></div></header>
+<header><h1>Piano<b>SF2</b></h1><div class="st"><span class="dot" id="mdot"></span><span id="mtxt">Starting…</span></div></header>
 <div class="panel">
-<div class="lbl">Piano preset</div><div class="chips" id="pre"></div><div class="row" style="margin-top:8px"><label class="chip" style="cursor:pointer">📁 Load SF2 layers<input type="file" id="sff" accept=".sf2,*/*" multiple></label></div><div id="sftracks"></div><div id="sfn" style="font-size:12px;color:var(--mut);margin-top:4px">Built-in piano synth</div>
+<div class="lbl">Piano preset</div><div class="chips" id="pre"></div><div class="row" style="margin-top:8px"><label class="chip" style="cursor:pointer">📁 Load SF2 instruments<input type="file" id="sff" accept=".sf2,*/*" multiple></label></div><div id="sftracks"></div><div id="sfn" style="font-size:12px;color:var(--mut);margin-top:4px">Built-in piano synth</div>
 <div class="row" style="margin-top:10px"><div style="flex:1"><div class="lbl">Piano volume</div><input type="range" id="pvol" min="0" max="1" step=".01" value=".8"></div>
 <div style="text-align:center"><div class="lbl">MIDI</div><div id="act"></div></div></div>
 <div id="last">Tap keys below or play your MIDI keyboard</div>
 <div id="keys"></div></div>
-<div class="row" style="margin:6px 0"><b style="flex:1">Effects</b><button class="chip" id="masterfx">Global effects</button></div><div class="flow" id="fxwhich">Global effects affect every layer</div>
-<div class="flow">↓</div>
-<div id="chain"></div>
-<div class="flow">↓</div><div class="flow">🔊 Master</div>
+<div class="flow">↓</div><div class="flow">🔊 Output</div>
+<div id="fxwhich"></div><div id="chain"></div>
 </div>
-<footer><div class="in"><button class="add" id="addb">+ ADD EFFECT</button><div style="flex:1"><div class="lbl" style="margin:0">Master</div><input type="range" id="mvol" min="0" max="1" step=".01" value=".8"></div></div></footer>
-<div id="sheet"><div class="sh" id="sh"></div></div>
+<footer><div class="in"><div style="flex:1"><div class="lbl" style="margin:0">Master volume</div><input type="range" id="mvol" min="0" max="1" step=".01" value=".8"></div></div></footer>
 <script>
 // ===== Effect library: engine kinds. Each defines default params + a DSP builder (the "Audio Effect Host" plugin contract) =====
 const P=(id,label,min,max,def,unit)=>({id,label,min,max,def,unit:unit||''});
@@ -168,8 +166,8 @@ function pickPreset(sf){const i=sf.presets.findIndex(p=>p.bank==0&&p.num==0);ret
 function useSf(sf,i,target=piano){sf.reg=sf.regions(sf.presets[i].i);target.sf=sf}
 // ===== App =====
 let ctx,host,piano,midi;
-function boot(){if(ctx){ctx.resume();return}ctx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});host=new EffectHost(ctx);piano=new Piano(ctx,host.input);host.master.gain.value=.8;piano.p=PIANOS[sel][1];activeHost=host;loadChain(CHAIN_PRESETS['Worship Piano'],host)}
-let sel=1,pendingChain=null,sfTracks=[],activeHost=null,layerId=1;
+function boot(){if(ctx){ctx.resume();return}ctx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});host=new EffectHost(ctx);host.clear();piano=new Piano(ctx,host.input);host.master.gain.value=.8;piano.p=PIANOS[sel][1]}
+let sel=1,sfTracks=[],activeHost=null,layerId=1;
 function builtinDef(k){const n=BUILTIN.find(b=>b[0]==k);return{kind:k,name:n[1],params:ENGINES[k].params}}
 function loadChain(list,h=activeHost||host){if(!h)return;h.clear();list.forEach(x=>h.add(typeof x=='string'?builtinDef(x):x.def,x.vals));render()}
 function render(){const el=$('#chain'),h=activeHost||host;$('#fxwhich').textContent=h===host?'Global effects affect every layer':'Editing effects for '+(sfTracks.find(t=>t.host===h)?.name||'SoundFont layer');if(!h||!h.fx.length){el.innerHTML='<div class="panel" style="text-align:center;color:#8a93a6">No effects on this layer yet.<br>Tap + ADD EFFECT</div>';return}
@@ -227,12 +225,9 @@ function openAdd(msg){const saved=store.get('pfx_presets')||{};
 PIANOS.forEach((p,i)=>{const b=document.createElement('button');b.className='chip'+(i==sel?' sel':'');b.textContent=p[0];b.onclick=()=>{sel=i;if(piano)piano.p=p[1];document.querySelectorAll('#pre .chip').forEach((c,j)=>c.classList.toggle('sel',j==i))};$('#pre').appendChild(b)});
 $('#pvol').oninput=e=>{boot();piano.out.gain.value=+e.target.value};
 $('#mvol').oninput=e=>{boot();host.master.gain.value=+e.target.value};
-$('#addb').onclick=()=>openAdd();
-$('#masterfx').onclick=()=>{boot();activeHost=host;renderLayers();render()};
-$('#sheet').onclick=e=>{if(e.target.id=='sheet')sheet(0)};
 
 function renderLayers(){const el=$('#sftracks');el.innerHTML='';sfTracks.forEach(t=>{const d=document.createElement('div');d.className='layer'+(activeHost===t.host?' active':'');d.innerHTML=`<div class="layerhead"><span class="layername">${esc(t.name)}</span><button class="ib del">×</button></div><select>${t.sf.presets.map((p,i)=>`<option value="${i}">${esc(p.name)} (${p.bank}:${p.num})</option>`).join('')}</select><div class="row"><span style="font-size:12px;color:var(--mut);white-space:nowrap">Volume</span><input type="range" min="0" max="1" step=".01" value=".8"><button class="ib fxbtn" style="font-size:13px">FX</button></div>`;const sl=d.querySelector('select');sl.value=t.preset;sl.onchange=()=>{t.preset=+sl.value;useSf(t.sf,t.preset,t.piano)};d.querySelector('input[type=range]').oninput=e=>t.host.master.gain.value=+e.target.value;d.querySelector('.fxbtn').onclick=()=>{activeHost=t.host;renderLayers();render();openAdd()};d.querySelector('.layername').onclick=()=>{activeHost=t.host;renderLayers();render()};d.querySelector('.del').onclick=()=>{t.piano.v&&Object.keys(t.piano.v).forEach(n=>t.piano.stop(+n,true));try{t.host.input.disconnect();t.host.master.disconnect()}catch(e){}sfTracks=sfTracks.filter(x=>x!==t);if(activeHost===t.host)activeHost=host;renderLayers();render()};el.appendChild(d)})}
-$('#sff').onchange=async e=>{const files=[...e.target.files];e.target.value='';if(!files.length)return;boot();const n=$('#sfn'),errors=[];n.textContent='Loading '+files.length+' SoundFont'+(files.length>1?'s':'')+'…';for(const f of files){try{const sf=parseSF2(await f.arrayBuffer()),h=new EffectHost(ctx,host.input),p=new Piano(ctx,h.input),k=pickPreset(sf);h.master.gain.value=.8;const t={id:layerId++,name:f.name,sf,host:h,piano:p,preset:k};useSf(sf,k,p);sfTracks.push(t)}catch(err){errors.push(f.name+': '+err.message)}}activeHost=host;renderLayers();render();n.textContent=(sfTracks.length+' SF2 layer'+(sfTracks.length===1?'':'s')+' loaded'+(errors.length?' · Failed: '+errors.join(' · '):' · select a layer’s FX button to add effects'))};
+$('#sff').onchange=async e=>{const files=[...e.target.files];e.target.value='';if(!files.length)return;boot();const n=$('#sfn'),errors=[];n.textContent='Loading '+files.length+' SoundFont'+(files.length>1?'s':'')+'…';for(const f of files){try{const sf=parseSF2(await f.arrayBuffer()),h=new EffectHost(ctx,host.input),p=new Piano(ctx,h.input),k=pickPreset(sf);h.clear();h.master.gain.value=.8;const t={id:layerId++,name:f.name,sf,host:h,piano:p,preset:k};useSf(sf,k,p);sfTracks.push(t)}catch(err){errors.push(f.name+': '+err.message)}}activeHost=host;renderLayers();render();n.textContent=(sfTracks.length+' SF2 layer'+(sfTracks.length===1?'':'s')+' loaded'+(errors.length?' · Failed: '+errors.join(' · '):' · layered directly with the piano'))};
 drawKeys();render();new Midi(H).init();
 document.addEventListener('pointerdown',()=>{if(!ctx)boot();else ctx.resume()},{once:false});
 </script></body></html>
