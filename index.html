@@ -65,7 +65,8 @@ pre{font-size:11px;background:var(--bg);padding:10px;border-radius:10px;overflow
 <div style="text-align:center"><div class="lbl">MIDI</div><div id="act"></div></div></div>
 <div id="last">Tap keys below or play your MIDI keyboard</div>
 <div id="keys"></div></div>
-<div class="flow">🎹 Piano layers · FX controls the selected layer</div><div class="flow">↓</div>
+<div class="row" style="margin:6px 0"><b style="flex:1">Effects</b><button class="chip" id="masterfx">Global effects</button></div><div class="flow" id="fxwhich">Global effects affect every layer</div>
+<div class="flow">↓</div>
 <div id="chain"></div>
 <div class="flow">↓</div><div class="flow">🔊 Master</div>
 </div>
@@ -171,7 +172,7 @@ function boot(){if(ctx){ctx.resume();return}ctx=new(window.AudioContext||window.
 let sel=1,pendingChain=null,sfTracks=[],activeHost=null,layerId=1;
 function builtinDef(k){const n=BUILTIN.find(b=>b[0]==k);return{kind:k,name:n[1],params:ENGINES[k].params}}
 function loadChain(list,h=activeHost||host){if(!h)return;h.clear();list.forEach(x=>h.add(typeof x=='string'?builtinDef(x):x.def,x.vals));render()}
-function render(){const el=$('#chain'),h=activeHost||host;if(!h||!h.fx.length){el.innerHTML='<div class="panel" style="text-align:center;color:#8a93a6">No effects on this layer yet.<br>Tap + ADD EFFECT</div>';return}
+function render(){const el=$('#chain'),h=activeHost||host;$('#fxwhich').textContent=h===host?'Global effects affect every layer':'Editing effects for '+(sfTracks.find(t=>t.host===h)?.name||'SoundFont layer');if(!h||!h.fx.length){el.innerHTML='<div class="panel" style="text-align:center;color:#8a93a6">No effects on this layer yet.<br>Tap + ADD EFFECT</div>';return}
  el.innerHTML='';h.fx.forEach((f,idx)=>{const d=document.createElement('div');d.className='fx'+(f.on?'':' off')+(f.open?' open':'');
   d.innerHTML=`<div class="fh"><div class="nm">${esc(f.name)}<small>${esc(f.ver)}</small></div><button class="tg">${f.on?'ON':'OFF'}</button><button class="ib ex">${f.open?'▾':'▸'}</button></div><div class="fb"></div>`;
   const fb=d.querySelector('.fb');
@@ -227,10 +228,11 @@ PIANOS.forEach((p,i)=>{const b=document.createElement('button');b.className='chi
 $('#pvol').oninput=e=>{boot();piano.out.gain.value=+e.target.value};
 $('#mvol').oninput=e=>{boot();host.master.gain.value=+e.target.value};
 $('#addb').onclick=()=>openAdd();
+$('#masterfx').onclick=()=>{boot();activeHost=host;renderLayers();render()};
 $('#sheet').onclick=e=>{if(e.target.id=='sheet')sheet(0)};
 
 function renderLayers(){const el=$('#sftracks');el.innerHTML='';sfTracks.forEach(t=>{const d=document.createElement('div');d.className='layer'+(activeHost===t.host?' active':'');d.innerHTML=`<div class="layerhead"><span class="layername">${esc(t.name)}</span><button class="ib del">×</button></div><select>${t.sf.presets.map((p,i)=>`<option value="${i}">${esc(p.name)} (${p.bank}:${p.num})</option>`).join('')}</select><div class="row"><span style="font-size:12px;color:var(--mut);white-space:nowrap">Volume</span><input type="range" min="0" max="1" step=".01" value=".8"><button class="ib fxbtn" style="font-size:13px">FX</button></div>`;const sl=d.querySelector('select');sl.value=t.preset;sl.onchange=()=>{t.preset=+sl.value;useSf(t.sf,t.preset,t.piano)};d.querySelector('input[type=range]').oninput=e=>t.host.master.gain.value=+e.target.value;d.querySelector('.fxbtn').onclick=()=>{activeHost=t.host;renderLayers();render();openAdd()};d.querySelector('.layername').onclick=()=>{activeHost=t.host;renderLayers();render()};d.querySelector('.del').onclick=()=>{t.piano.v&&Object.keys(t.piano.v).forEach(n=>t.piano.stop(+n,true));try{t.host.input.disconnect();t.host.master.disconnect()}catch(e){}sfTracks=sfTracks.filter(x=>x!==t);if(activeHost===t.host)activeHost=host;renderLayers();render()};el.appendChild(d)})}
-$('#sff').onchange=async e=>{const files=[...e.target.files];if(!files.length)return;boot();const n=$('#sfn');n.textContent='Loading '+files.length+' SoundFont'+(files.length>1?'s':'')+'…';for(const f of files){try{const sf=parseSF2(await f.arrayBuffer()),h=new EffectHost(ctx,host.input),p=new Piano(ctx,h.input),k=pickPreset(sf);h.master.gain.value=.8;const t={id:layerId++,name:f.name,sf,host:h,piano:p,preset:k};useSf(sf,k,p);sfTracks.push(t);activeHost=h}catch(err){n.textContent='⚠ '+f.name+': '+err.message}}n.textContent=sfTracks.length+' SF2 layer'+(sfTracks.length===1?'':'s')+' loaded · tap FX to edit each layer';renderLayers();render()};
+$('#sff').onchange=async e=>{const files=[...e.target.files];e.target.value='';if(!files.length)return;boot();const n=$('#sfn'),errors=[];n.textContent='Loading '+files.length+' SoundFont'+(files.length>1?'s':'')+'…';for(const f of files){try{const sf=parseSF2(await f.arrayBuffer()),h=new EffectHost(ctx,host.input),p=new Piano(ctx,h.input),k=pickPreset(sf);h.master.gain.value=.8;const t={id:layerId++,name:f.name,sf,host:h,piano:p,preset:k};useSf(sf,k,p);sfTracks.push(t)}catch(err){errors.push(f.name+': '+err.message)}}activeHost=host;renderLayers();render();n.textContent=(sfTracks.length+' SF2 layer'+(sfTracks.length===1?'':'s')+' loaded'+(errors.length?' · Failed: '+errors.join(' · '):' · select a layer’s FX button to add effects'))};
 drawKeys();render();new Midi(H).init();
 document.addEventListener('pointerdown',()=>{if(!ctx)boot();else ctx.resume()},{once:false});
 </script></body></html>

@@ -35,7 +35,11 @@ class MainActivity : Activity() {
             webChromeClient = object : WebChromeClient() {
                 override fun onShowFileChooser(w: WebView, cb: ValueCallback<Array<Uri>>, p: FileChooserParams): Boolean {
                     fileCb?.onReceiveValue(null); fileCb = cb
-                    val i = Intent(Intent.ACTION_GET_CONTENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }
+                    val i = Intent(Intent.ACTION_GET_CONTENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, p.mode == FileChooserParams.MODE_OPEN_MULTIPLE)
+                    }
                     return try { startActivityForResult(Intent.createChooser(i, "Choose file"), 1); true }
                     catch (e: Exception) { fileCb = null; false }
                 }
