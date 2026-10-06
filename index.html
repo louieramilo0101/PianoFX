@@ -13,6 +13,7 @@ h1{font-size:22px;margin:0;letter-spacing:.5px}h1 b{color:var(--ac)}
 .st{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mut);background:var(--card);padding:8px 12px;border-radius:20px}
 .dot{width:10px;height:10px;border-radius:50%;background:#444}.dot.on{background:#3ddc84}
 .panel{background:var(--card);border-radius:18px;padding:14px;margin-bottom:12px}
+.layer{background:var(--card);border-radius:16px;padding:12px;margin:8px 0}.layerhead{display:flex;align-items:center;gap:8px}.layername{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}.layer select{max-width:100%;height:40px;border:0;border-radius:10px;background:var(--card2);color:var(--tx);padding:0 8px;font-size:14px}.layer.active{outline:2px solid var(--ac)}
 .row{display:flex;align-items:center;gap:12px}
 .lbl{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
@@ -59,12 +60,12 @@ pre{font-size:11px;background:var(--bg);padding:10px;border-radius:10px;overflow
 <div id="app">
 <header><h1>Piano<b>FX</b></h1><div class="st"><span class="dot" id="mdot"></span><span id="mtxt">Starting…</span></div></header>
 <div class="panel">
-<div class="lbl">Piano preset</div><div class="chips" id="pre"></div><div class="row" style="margin-top:8px"><label class="chip" style="cursor:pointer">📁 Load SF2<input type="file" id="sff" accept="*/*"></label><select id="sfp" style="display:none;flex:1;min-width:0;height:44px;border-radius:12px;background:var(--card2);color:var(--tx);border:0;padding:0 8px;font-size:15px"></select></div><div id="sfn" style="font-size:12px;color:var(--mut);margin-top:4px">Built-in piano synth</div>
+<div class="lbl">Piano preset</div><div class="chips" id="pre"></div><div class="row" style="margin-top:8px"><label class="chip" style="cursor:pointer">📁 Load SF2 layers<input type="file" id="sff" accept=".sf2,*/*" multiple></label></div><div id="sftracks"></div><div id="sfn" style="font-size:12px;color:var(--mut);margin-top:4px">Built-in piano synth</div>
 <div class="row" style="margin-top:10px"><div style="flex:1"><div class="lbl">Piano volume</div><input type="range" id="pvol" min="0" max="1" step=".01" value=".8"></div>
 <div style="text-align:center"><div class="lbl">MIDI</div><div id="act"></div></div></div>
 <div id="last">Tap keys below or play your MIDI keyboard</div>
 <div id="keys"></div></div>
-<div class="flow">🎹 Piano</div><div class="flow">↓</div>
+<div class="flow">🎹 Piano layers · FX controls the selected layer</div><div class="flow">↓</div>
 <div id="chain"></div>
 <div class="flow">↓</div><div class="flow">🔊 Master</div>
 </div>
@@ -103,7 +104,7 @@ const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){retu
 
 // ===== Audio Effect Host: owns chain, wiring, bypass, reorder. Knows nothing about MIDI or piano =====
 class EffectHost{
- constructor(ctx){this.c=ctx;this.fx=[];this.input=ctx.createGain();this.master=ctx.createGain();this.master.connect(ctx.destination)}
+ constructor(ctx,dest){this.c=ctx;this.fx=[];this.input=ctx.createGain();this.master=ctx.createGain();this.master.connect(dest||ctx.destination)}
  make(def,vals){const inst={uid:uid++,kind:def.kind,name:def.name,ver:def.version||'built-in',params:def.params,presets:def.presets||[],vals:{},on:true,open:true};
   def.params.forEach(p=>inst.vals[p.id]=vals&&vals[p.id]!=null?vals[p.id]:p.def);
   inst.node=ENGINES[def.kind].build(this.c);def.params.forEach(p=>inst.node.set(p.id,inst.vals[p.id]));return inst}
@@ -163,34 +164,34 @@ function sfVoice(c,sf,n,vel){const rs=sf.reg.filter(r=>n>=r.klo&&n<=r.khi&&vel>=
   s.connect(e);let out=e;if(c.createStereoPanner&&r.pan){const p=c.createStereoPanner();p.pan.value=Math.max(-1,Math.min(1,r.pan));e.connect(p);out=p}out.connect(g);s.start(t);os.push(s)});
  return os.length?{g,os}:null}
 function pickPreset(sf){const i=sf.presets.findIndex(p=>p.bank==0&&p.num==0);return i<0?0:i}
-function useSf(sf,i){sf.reg=sf.regions(sf.presets[i].i);piano.sf=sf}
+function useSf(sf,i,target=piano){sf.reg=sf.regions(sf.presets[i].i);target.sf=sf}
 // ===== App =====
 let ctx,host,piano,midi;
-function boot(){if(ctx){ctx.resume();return}ctx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});host=new EffectHost(ctx);piano=new Piano(ctx,host.input);host.master.gain.value=.8;piano.p=PIANOS[sel][1];loadChain(CHAIN_PRESETS['Worship Piano'])}
-let sel=1,pendingChain=null;
+function boot(){if(ctx){ctx.resume();return}ctx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});host=new EffectHost(ctx);piano=new Piano(ctx,host.input);host.master.gain.value=.8;piano.p=PIANOS[sel][1];activeHost=host;loadChain(CHAIN_PRESETS['Worship Piano'],host)}
+let sel=1,pendingChain=null,sfTracks=[],activeHost=null,layerId=1;
 function builtinDef(k){const n=BUILTIN.find(b=>b[0]==k);return{kind:k,name:n[1],params:ENGINES[k].params}}
-function loadChain(list){host.clear();list.forEach(x=>host.add(typeof x=='string'?builtinDef(x):x.def,x.vals));render()}
-function render(){const el=$('#chain');if(!host||!host.fx.length){el.innerHTML='<div class="panel" style="text-align:center;color:#8a93a6">No effects yet.<br>Tap + ADD EFFECT</div>';return}
- el.innerHTML='';host.fx.forEach((f,idx)=>{const d=document.createElement('div');d.className='fx'+(f.on?'':' off')+(f.open?' open':'');
+function loadChain(list,h=activeHost||host){if(!h)return;h.clear();list.forEach(x=>h.add(typeof x=='string'?builtinDef(x):x.def,x.vals));render()}
+function render(){const el=$('#chain'),h=activeHost||host;if(!h||!h.fx.length){el.innerHTML='<div class="panel" style="text-align:center;color:#8a93a6">No effects on this layer yet.<br>Tap + ADD EFFECT</div>';return}
+ el.innerHTML='';h.fx.forEach((f,idx)=>{const d=document.createElement('div');d.className='fx'+(f.on?'':' off')+(f.open?' open':'');
   d.innerHTML=`<div class="fh"><div class="nm">${esc(f.name)}<small>${esc(f.ver)}</small></div><button class="tg">${f.on?'ON':'OFF'}</button><button class="ib ex">${f.open?'▾':'▸'}</button></div><div class="fb"></div>`;
   const fb=d.querySelector('.fb');
-  f.params.forEach(p=>{const r=document.createElement('div');r.className='pr';const step=(p.max-p.min)/200;r.innerHTML=`<span>${esc(p.label)}</span><input type="range" min="${p.min}" max="${p.max}" step="${step}" value="${f.vals[p.id]}"><span></span>`;const out=r.lastChild,inp=r.children[1];const show=()=>out.textContent=(+inp.value).toFixed(p.max-p.min>20?0:2)+(p.unit?' '+p.unit:'');show();inp.oninput=()=>{host.set(f,p.id,+inp.value);show()};fb.appendChild(r)});
-  if(f.presets.length){const c=document.createElement('div');c.className='chips';c.style.marginTop='8px';f.presets.forEach(pr=>{const b=document.createElement('button');b.className='chip';b.textContent=pr.name;b.onclick=()=>{Object.entries(pr.values).forEach(([k,v])=>host.set(f,k,v));render()};c.appendChild(b)});fb.appendChild(c)}
+  f.params.forEach(p=>{const r=document.createElement('div');r.className='pr';const step=(p.max-p.min)/200;r.innerHTML=`<span>${esc(p.label)}</span><input type="range" min="${p.min}" max="${p.max}" step="${step}" value="${f.vals[p.id]}"><span></span>`;const out=r.lastChild,inp=r.children[1];const show=()=>out.textContent=(+inp.value).toFixed(p.max-p.min>20?0:2)+(p.unit?' '+p.unit:'');show();inp.oninput=()=>{h.set(f,p.id,+inp.value);show()};fb.appendChild(r)});
+  if(f.presets.length){const c=document.createElement('div');c.className='chips';c.style.marginTop='8px';f.presets.forEach(pr=>{const b=document.createElement('button');b.className='chip';b.textContent=pr.name;b.onclick=()=>{Object.entries(pr.values).forEach(([k,v])=>h.set(f,k,v));render()};c.appendChild(b)});fb.appendChild(c)}
   const m=document.createElement('div');m.className='mv';m.innerHTML='<button class="ib up">▲ Up</button><button class="ib dn">▼ Down</button><button class="ib del">🗑 Delete</button>';fb.appendChild(m);
-  d.querySelector('.tg').onclick=()=>{f.on=!f.on;host.wire();render()};d.querySelector('.ex').onclick=()=>{f.open=!f.open;render()};
-  m.querySelector('.up').onclick=()=>{host.move(f.uid,-1);render()};m.querySelector('.dn').onclick=()=>{host.move(f.uid,1);render()};m.querySelector('.del').onclick=()=>{host.remove(f.uid);render()};
-  el.appendChild(d);if(idx<host.fx.length-1){const a=document.createElement('div');a.className='flow';a.textContent='↓';el.appendChild(a)}})}
+  d.querySelector('.tg').onclick=()=>{f.on=!f.on;h.wire();render()};d.querySelector('.ex').onclick=()=>{f.open=!f.open;render()};
+  m.querySelector('.up').onclick=()=>{h.move(f.uid,-1);render()};m.querySelector('.dn').onclick=()=>{h.move(f.uid,1);render()};m.querySelector('.del').onclick=()=>{h.remove(f.uid);render()};
+  el.appendChild(d);if(idx<h.fx.length-1){const a=document.createElement('div');a.className='flow';a.textContent='↓';el.appendChild(a)}})}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&lt;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // pfx parsing + validation: parameters drive the auto-generated UI
 function parsePfx(txt){const j=JSON.parse(txt);if(j.format!='pfx'||!ENGINES[j.engine]||!Array.isArray(j.params))throw Error('Not a valid .pfx package');
  const params=j.params.map(p=>({id:String(p.id),label:String(p.label||p.id),min:+p.min,max:+p.max,def:+(p.def??p.min),unit:p.unit||''}));return{kind:j.engine,name:j.name||'Imported',version:j.version||'1.0',params,presets:j.presets||[]}}
-function addPfx(txt){const d=parsePfx(txt);host.add(d);render();return d}
+function addPfx(txt){const d=parsePfx(txt);(activeHost||host).add(d);render();return d}
 // MIDI handlers + on-screen keys
 let actT;function flash(t){const a=$('#act');a.classList.add('hit');$('#last').textContent=t;clearTimeout(actT);actT=setTimeout(()=>a.classList.remove('hit'),120)}
 const NN=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const H={status(n,t){$('#mdot').className='dot'+(n?' on':'');$('#mtxt').textContent=t},
- note(n,v,ch){boot();piano.on(n,v);flash(`Note ${NN[n%12]}${Math.floor(n/12)-1} · vel ${v} · ch ${ch}`)},off(n){piano&&piano.off(n)},
- pedal(d,ch){boot();piano.pedal(d);flash('Sustain '+(d?'DOWN':'up')+' · ch '+ch)}};
+ note(n,v,ch){boot();piano.on(n,v);sfTracks.forEach(t=>t.piano.on(n,v));flash(`Note ${NN[n%12]}${Math.floor(n/12)-1} · vel ${v} · ch ${ch}`)},off(n){piano&&piano.off(n);sfTracks.forEach(t=>t.piano.off(n))},
+ pedal(d,ch){boot();piano.pedal(d);sfTracks.forEach(t=>t.piano.pedal(d));flash('Sustain '+(d?'DOWN':'up')+' · ch '+ch)}};
 function drawKeys(){const k=$('#keys'),blk=[1,3,6,8,10];let w=0;for(let n=60;n<=72;n++){if(blk.includes(n%12))continue;const b=document.createElement('button');b.className='k';b.dataset.n=n;k.appendChild(b)}
  const whites=[...k.children].length;let wi=0;for(let n=60;n<=72;n++){if(blk.includes(n%12)){const b=document.createElement('button');b.className='k b';b.dataset.n=n;b.style.left=`calc(${wi/whites*100}% - 3%)`;k.appendChild(b)}else wi++}
  k.querySelectorAll('.k').forEach(b=>{const n=+b.dataset.n;b.onpointerdown=e=>{b.setPointerCapture(e.pointerId);b.classList.add('dn');H.note(n,100,1)};const u=()=>{b.classList.remove('dn');H.off(n)};b.onpointerup=u;b.onpointercancel=u})}
@@ -212,14 +213,14 @@ function openAdd(msg){const saved=store.get('pfx_presets')||{};
   "presets":[{"name":"Cathedral","values":{…}}],
   "assets":[] }</pre>`;
  const s=$('#sh');$('#cl').onclick=()=>sheet(0);
- s.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{boot();host.add(builtinDef(b.dataset.b));render();sheet(0)});
+ s.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{boot();(activeHost||host).add(builtinDef(b.dataset.b));render();sheet(0)});
  const say=t=>{$('#msg').textContent=t};
  const rd=(inp,fn)=>inp.onchange=()=>{const f=inp.files[0];if(!f)return;f.text().then(fn).catch(e=>say('⚠ '+e.message))};
  rd($('#fp'),t=>{boot();const d=addPfx(t);sheet(0)});
  $('#smp').onclick=()=>{boot();addPfx(JSON.stringify(SAMPLE_PFX));sheet(0)};
- s.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{boot();const k=b.dataset.p;const l=CHAIN_PRESETS[k]||saved[k];loadChain(l.map(x=>typeof x=='string'?x:x));sheet(0)});
+ s.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{boot();const k=b.dataset.p;const l=CHAIN_PRESETS[k]||saved[k];loadChain(l,activeHost||host);sheet(0)});
  rd($('#fc'),t=>{boot();const j=JSON.parse(t);if(!Array.isArray(j.chain))throw Error('Invalid preset');loadChain(j.chain.filter(x=>typeof x=='string'&&ENGINES[x]));sheet(0)});
- $('#sv').onclick=()=>{const n=$('#pn').value.trim();if(!n||!host)return say('Enter a name first');const sv=store.get('pfx_presets')||{};sv[n]=host.fx.map(f=>ENGINES[f.kind]&&BUILTIN.some(b=>b[0]==f.kind)&&f.ver=='built-in'?{def:{kind:f.kind,name:f.name,params:f.params},vals:f.vals}:{def:{kind:f.kind,name:f.name,version:f.ver,params:f.params,presets:f.presets},vals:f.vals});store.set('pfx_presets',sv);say('Saved "'+n+'"')};
+ $('#sv').onclick=()=>{const n=$('#pn').value.trim(),h=activeHost||host;if(!n||!h)return say('Enter a name first');const sv=store.get('pfx_presets')||{};sv[n]=h.fx.map(f=>ENGINES[f.kind]&&BUILTIN.some(b=>b[0]==f.kind)&&f.ver=='built-in'?{def:{kind:f.kind,name:f.name,params:f.params},vals:f.vals}:{def:{kind:f.kind,name:f.name,version:f.ver,params:f.params,presets:f.presets},vals:f.vals});store.set('pfx_presets',sv);say('Saved "'+n+'"')};
  sheet(1)}
 // init
 PIANOS.forEach((p,i)=>{const b=document.createElement('button');b.className='chip'+(i==sel?' sel':'');b.textContent=p[0];b.onclick=()=>{sel=i;if(piano)piano.p=p[1];document.querySelectorAll('#pre .chip').forEach((c,j)=>c.classList.toggle('sel',j==i))};$('#pre').appendChild(b)});
@@ -228,11 +229,8 @@ $('#mvol').oninput=e=>{boot();host.master.gain.value=+e.target.value};
 $('#addb').onclick=()=>openAdd();
 $('#sheet').onclick=e=>{if(e.target.id=='sheet')sheet(0)};
 
-$('#sff').onchange=async e=>{const f=e.target.files[0];if(!f)return;const n=$('#sfn');n.textContent='Loading '+f.name+'…';
- try{boot();const sf=parseSF2(await f.arrayBuffer()),sl=$('#sfp');sl.innerHTML='<option value="-1">Built-in synth</option>'+sf.presets.map((p,i)=>`<option value="${i}">${esc(p.name)} (${p.bank}:${p.num})</option>`).join('');
-  const k=pickPreset(sf);sl.value=k;sl.style.display='block';useSf(sf,k);n.textContent='SoundFont: '+f.name+' · '+sf.presets.length+' presets';
-  sl.onchange=()=>{const v=+sl.value;if(v<0){piano.sf=null;n.textContent='Built-in piano synth'}else{useSf(sf,v);n.textContent='SoundFont: '+f.name}}}
- catch(err){n.textContent='⚠ '+err.message}};
+function renderLayers(){const el=$('#sftracks');el.innerHTML='';sfTracks.forEach(t=>{const d=document.createElement('div');d.className='layer'+(activeHost===t.host?' active':'');d.innerHTML=`<div class="layerhead"><span class="layername">${esc(t.name)}</span><button class="ib del">×</button></div><select>${t.sf.presets.map((p,i)=>`<option value="${i}">${esc(p.name)} (${p.bank}:${p.num})</option>`).join('')}</select><div class="row"><span style="font-size:12px;color:var(--mut);white-space:nowrap">Volume</span><input type="range" min="0" max="1" step=".01" value=".8"><button class="ib fxbtn" style="font-size:13px">FX</button></div>`;const sl=d.querySelector('select');sl.value=t.preset;sl.onchange=()=>{t.preset=+sl.value;useSf(t.sf,t.preset,t.piano)};d.querySelector('input[type=range]').oninput=e=>t.host.master.gain.value=+e.target.value;d.querySelector('.fxbtn').onclick=()=>{activeHost=t.host;renderLayers();render();openAdd()};d.querySelector('.layername').onclick=()=>{activeHost=t.host;renderLayers();render()};d.querySelector('.del').onclick=()=>{t.piano.v&&Object.keys(t.piano.v).forEach(n=>t.piano.stop(+n,true));try{t.host.input.disconnect();t.host.master.disconnect()}catch(e){}sfTracks=sfTracks.filter(x=>x!==t);if(activeHost===t.host)activeHost=host;renderLayers();render()};el.appendChild(d)})}
+$('#sff').onchange=async e=>{const files=[...e.target.files];if(!files.length)return;boot();const n=$('#sfn');n.textContent='Loading '+files.length+' SoundFont'+(files.length>1?'s':'')+'…';for(const f of files){try{const sf=parseSF2(await f.arrayBuffer()),h=new EffectHost(ctx,host.input),p=new Piano(ctx,h.input),k=pickPreset(sf);h.master.gain.value=.8;const t={id:layerId++,name:f.name,sf,host:h,piano:p,preset:k};useSf(sf,k,p);sfTracks.push(t);activeHost=h}catch(err){n.textContent='⚠ '+f.name+': '+err.message}}n.textContent=sfTracks.length+' SF2 layer'+(sfTracks.length===1?'':'s')+' loaded · tap FX to edit each layer';renderLayers();render()};
 drawKeys();render();new Midi(H).init();
 document.addEventListener('pointerdown',()=>{if(!ctx)boot();else ctx.resume()},{once:false});
 </script></body></html>
